@@ -1,7 +1,5 @@
 export interface InputData {
-    left: false;
-    right: false;
-    up: false;
-    down: false;
+    pointerX: number;
+    pointerY: number;
     tick: number;
 }

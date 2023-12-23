@@ -42,19 +42,7 @@ export class GameRoom extends Room<RoomState> {
 
       // dequeue player inputs
       while (input = player.inputQueue.shift()) {
-        if (input.left) {
-          player.x -= velocity;
-
-        } else if (input.right) {
-          player.x += velocity;
-        }
-
-        if (input.up) {
-          player.y -= velocity;
-
-        } else if (input.down) {
-          player.y += velocity;
-        }
+        
 
         player.tick = input.tick;
       }
