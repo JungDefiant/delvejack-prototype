@@ -1,0 +1,12 @@
+{
+    "itm_base": {
+        "item_type": "BaseItem",
+        "weight": 0,
+        "icon": "/path/to/icon",
+        "model_info": {
+            "path": "/path/to/sprite"
+        },
+        "onEquipAbility": "ab_base",
+        "onUseAbility": "ab_base"
+    }
+}

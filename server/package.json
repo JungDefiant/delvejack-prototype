@@ -35,6 +35,8 @@
     "@colyseus/playground": "^0.15.3",
     "@colyseus/tools": "^0.15.0",
     "colyseus": "^0.15.0",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "navmesh": "^2.3.1",
+    "tseep": "^1.1.3"
   }
 }

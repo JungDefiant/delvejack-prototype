@@ -1,9 +1,15 @@
 import { Room, Client } from "@colyseus/core";
 import { RoomState } from "./schema/RoomState";
-import { Player } from "./schema/Player";
+import { PlayerController } from "./schema/PlayerController";
+import { InputData } from "./schema/Input";
+import { Unit } from "./schema/units/Unit";
 
 export class GameRoom extends Room<RoomState> {
   maxClients = 4;
+
+  // TimeStep Settings
+  elapsedTime = 0;
+  fixedTimeStep = 1000 / 40;
 
   onCreate(options: any) {
     this.setState(new RoomState());
@@ -12,20 +18,45 @@ export class GameRoom extends Room<RoomState> {
     this.onMessage(0, (client, input) => {
       // get reference to the player who sent the message
       const player = this.state.players.get(client.sessionId);
-      const velocity = 2;
 
-      if (input.left) {
-        player.x -= velocity;
+      // enqueue input to user input buffer.
+      player.inputQueue.push(input);
+    });
 
-      } else if (input.right) {
-        player.x += velocity;
+    let elapsedTime = 0;
+    this.setSimulationInterval((deltaTime) => {
+      this.update(deltaTime);
+
+      while (elapsedTime >= this.fixedTimeStep) {
+        elapsedTime -= this.fixedTimeStep;
+        this.fixedTick(this.fixedTimeStep);
       }
+    });
+  }
 
-      if (input.up) {
-        player.y -= velocity;
+  fixedTick(timeStep: number) {
+    const velocity = 2;
 
-      } else if (input.down) {
-        player.y += velocity;
+    this.state.players.forEach(player => {
+      let input: InputData;
+
+      // dequeue player inputs
+      while (input = player.inputQueue.shift()) {
+        if (input.left) {
+          player.x -= velocity;
+
+        } else if (input.right) {
+          player.x += velocity;
+        }
+
+        if (input.up) {
+          player.y -= velocity;
+
+        } else if (input.down) {
+          player.y += velocity;
+        }
+
+        player.tick = input.tick;
       }
     });
   }
@@ -37,11 +68,12 @@ export class GameRoom extends Room<RoomState> {
     const mapHeight = 600;
 
     // create Player instance
-    const player = new Player();
+    const player = new PlayerController();
 
     // place Player at a random position
     player.x = (Math.random() * mapWidth);
     player.y = (Math.random() * mapHeight);
+    player.velocity = 2;
 
     // place player in the map of players by its sessionId
     // (client.sessionId is unique per connection!)
@@ -55,6 +87,29 @@ export class GameRoom extends Room<RoomState> {
 
   onDispose() {
     console.log("room", this.roomId, "disposing...");
+  }
+
+  update(deltaTime: number) {
+    this.state.players.forEach(player => {
+      let input: any;
+
+      // dequeue player inputs
+      while (input = player.inputQueue.shift()) {
+        if (input.left) {
+          player.x -= player.velocity;
+
+        } else if (input.right) {
+          player.x += player.velocity;
+        }
+
+        if (input.up) {
+          player.y -= player.velocity;
+
+        } else if (input.down) {
+          player.y += player.velocity;
+        }
+      }
+    });
   }
 
 }

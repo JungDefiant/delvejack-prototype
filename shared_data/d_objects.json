@@ -1,0 +1,22 @@
+{
+    "obj_base": {
+        "object_type": 0,
+        "attribute_info": {
+            "attr_base": 0
+        },
+        "model_info": {
+            "path": "/path/to/sprite"
+        },
+        "inventory_info": {
+            "inventory_base": {
+                "capacity": 0,
+                "itemTypeKey": [0],
+                "equipSlots": [0]
+            }
+        },
+        "trap_info": {
+            "trapAbilityKey": "ab_base"
+        },
+        "dialogue_key": "dlg_base"
+    }
+}

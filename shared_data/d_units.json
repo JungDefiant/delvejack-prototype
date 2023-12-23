@@ -1,0 +1,24 @@
+{
+    "unit_base": {
+        "attribute_info": {
+            "attr_base": 0
+        },
+        "model_info": {
+            "path": "/path/to/sprite"
+        },
+        "input_info": {
+            "inputType": 0,
+            "speedAttr": "attr_base"
+        },
+        "inventory_info": {
+            "inventory_base": {
+                "capacity": 0,
+                "itemTypeKey": [0],
+                "equipSlots": [0]
+            }
+        },
+        "ability_info": {
+            "ab_base": "evt_useAbility1"
+        }
+    }
+}

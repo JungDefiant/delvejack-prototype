@@ -1,0 +1,5 @@
+{
+    "unit_events": {
+        "evt_useAbility1": ["number"]
+    }
+}

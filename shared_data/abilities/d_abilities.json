@@ -1,0 +1,54 @@
+{
+    "ab_base": {
+        "icon": "path/to/icon",
+        "recharge_time": 0,
+        "cast_time": 0,
+        "cast_animation": "a_idle",
+        "on_cast_fx_info": {
+
+        },
+        "resource_attr_key": "attr_base",
+        "resource_cost": 0,
+        "targeting_info": {
+            "range_type": "Direct",
+            "range_value": 0,
+            "special_behav_script": ""
+        },
+        "ability_action_seq": [
+            {
+                "action_type": "ApplyDirectEffect",
+                "effect_key_array": [
+                    "damage"
+                ],
+                "target_filter": [
+                    "player"
+                ],
+                "duration_time": 0,
+                "tick_rate": 0,
+                "on_tick_fx_info": {
+
+                },
+                "blink_info": {
+
+                },
+                "dash_info": {
+
+                },
+                "proj_info": {
+
+                },
+                "aoe_info": {
+
+                }
+            }
+        ],
+        "ability_variables": {
+            "act_0": {
+                "eff_0": {
+                    "damage": 0
+                }
+            }
+        },
+        "special_behav_script": ""
+    }
+}

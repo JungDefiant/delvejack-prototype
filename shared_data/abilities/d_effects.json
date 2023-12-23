@@ -1,0 +1,9 @@
+{
+    "eff_base": {
+        "target_type": "Source",
+        "duration_type": "Instant",
+        "target_attr": "attr_base",
+        "modifier_type": "AddSubtract",
+        "tags_applied": ["t_base"]
+    }
+}

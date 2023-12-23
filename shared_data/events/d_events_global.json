@@ -1,0 +1,5 @@
+{
+    "global_events": {
+        "evt_onDisconnect": ["number"]
+    }
+}
