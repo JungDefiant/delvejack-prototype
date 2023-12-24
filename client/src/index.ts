@@ -1,6 +1,11 @@
 import { Client, Room } from "colyseus.js";
 import Phaser from "phaser";
 
+interface InputData {
+    pointerX: number;
+    pointerY: number;
+}
+
 // custom scene class
 export class GameScene extends Phaser.Scene {
 
@@ -13,12 +18,9 @@ export class GameScene extends Phaser.Scene {
 
     // Input Settings
     inputPayload = {
-        left: false,
-        right: false,
-        up: false,
-        down: false,
+        pointerX: 0,
+        pointerY: 0
     };
-    cursorKeys: Phaser.Types.Input.Keyboard.CursorKeys;
 
     // TimeStep Settings
     elapsedTime = 0;
@@ -28,7 +30,7 @@ export class GameScene extends Phaser.Scene {
         // preload scene
         this.load.image('ship_0001', 'https://cdn.glitch.global/3e033dcd-d5be-4db4-99e8-086ae90969ec/ship_0001.png');
 
-        this.cursorKeys = this.input.keyboard.createCursorKeys();
+        this.input.mouse.enabled = true;
     }
 
     async create() {
@@ -96,6 +98,11 @@ export class GameScene extends Phaser.Scene {
         // skip loop if not connected yet.
         if (!this.currentPlayer) { return; }
 
+        if(game.input.activePointer.leftButtonDown()) {
+            this.inputPayload.pointerX = game.input.activePointer.x;
+            this.inputPayload.pointerY = game.input.activePointer.y;
+        }
+
         this.elapsedTime += delta;
         while (this.elapsedTime >= this.fixedTimeStep) {
             this.elapsedTime -= this.fixedTimeStep;
@@ -109,25 +116,9 @@ export class GameScene extends Phaser.Scene {
 
         // send input to the server
         const { velocity } = this.playerEntities[this.room.sessionId].data.values;
-        this.inputPayload.left = this.cursorKeys.left.isDown;
-        this.inputPayload.right = this.cursorKeys.right.isDown;
-        this.inputPayload.up = this.cursorKeys.up.isDown;
-        this.inputPayload.down = this.cursorKeys.down.isDown;
+        this.inputPayload.pointerX;
+        this.inputPayload.pointerY;
         this.room.send(0, this.inputPayload);
-
-        if (this.inputPayload.left) {
-            this.currentPlayer.x -= velocity;
-
-        } else if (this.inputPayload.right) {
-            this.currentPlayer.x += velocity;
-        }
-
-        if (this.inputPayload.up) {
-            this.currentPlayer.y -= velocity;
-
-        } else if (this.inputPayload.down) {
-            this.currentPlayer.y += velocity;
-        }
 
         for (let sessionId in this.playerEntities) {
             if (sessionId === this.room.sessionId) {

@@ -37,6 +37,7 @@
     "colyseus": "^0.15.0",
     "easystarjs": "^0.4.4",
     "express": "^4.18.2",
+    "fs": "^0.0.1-security",
     "steering": "^0.0.5",
     "tseep": "^1.1.3"
   }
