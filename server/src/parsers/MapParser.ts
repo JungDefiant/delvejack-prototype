@@ -1,7 +1,8 @@
-import { MapData, MapRow } from "../rooms/schema/MapData";
 import fs from "fs";
+import { MapData, MapRow } from "../schema/MapData";
 
 export class MapParser {
+
     static ParseMapDataFromJSON(path: string): MapData {
         const mapJSON = JSON.parse(fs.readFileSync(path, 'utf-8'));
         const wallData = mapJSON.layers[1].data;
@@ -19,6 +20,9 @@ export class MapParser {
         }
 
         const newMapData = new MapData();
+        newMapData.height = mapJSON.height * mapJSON.tileheight;
+        newMapData.width = mapJSON.width * mapJSON.tilewidth;
+        newMapData.gridSize = mapJSON.tileheight;
 
         for (let i = 0; i < wallData.length; i += width) {
             const newMapRow = new MapRow();
@@ -32,6 +36,20 @@ export class MapParser {
     }
 
     static CreateEasyStarMapFromMapData(map: MapData): number[][] {
-        return null;
+
+        const grid: number[][] = [];
+
+        for (let i = 0; i < map.arrayData.length; i++) {
+            const mapDataRow = map.arrayData[i];
+            const gridRow = [];
+            for (let j = 0; j < mapDataRow.rowData.length; j++) {
+                const number = mapDataRow.rowData[j];
+                gridRow.push(number);
+            }
+
+            grid.push(gridRow);
+        }
+
+        return grid;
     }
 }

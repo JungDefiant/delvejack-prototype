@@ -1,0 +1,1 @@
+npx schema-codegen src/schema/* --output ../client/src/schema/ --ts

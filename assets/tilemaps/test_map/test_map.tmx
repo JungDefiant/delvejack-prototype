@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="50" height="40" tilewidth="16" tileheight="16" infinite="0" nextlayerid="3" nextobjectid="1">
  <tileset firstgid="1" name="Dungeon" tilewidth="16" tileheight="16" tilecount="625" columns="25">
-  <image source="../../../assets/Pixel Crawler - FREE - 1.8/Pixel Crawler - FREE - 1.8/Environment/Dungeon Prison/Assets/Tiles.png" width="400" height="400"/>
+  <image source="Tiles.png" width="400" height="400"/>
   <tile id="0">
    <properties>
     <property name="walkable" type="bool" value="false"/>

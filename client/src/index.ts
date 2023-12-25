@@ -1,9 +1,12 @@
 import { Client, Room } from "colyseus.js";
-import Phaser from "phaser";
+import Phaser, { Tilemaps } from "phaser";
+import { RoomState } from "./schema/RoomState";
+import { convertPixelPositionToGridPosition } from "./utils/positionConversion";
 
 interface InputData {
-    pointerX: number;
-    pointerY: number;
+    pointerX: number,
+    pointerY: number,
+    sent: boolean
 }
 
 // custom scene class
@@ -11,7 +14,7 @@ export class GameScene extends Phaser.Scene {
 
     // Phase Room Settings
     client = new Client("ws://localhost:2567");
-    room: Room;
+    room: Room<RoomState>;
     playerEntities: { [sessionId: string]: any } = {};
     currentPlayer: Phaser.Types.Physics.Arcade.ImageWithDynamicBody;
     remoteRef: Phaser.GameObjects.Rectangle;
@@ -19,18 +22,29 @@ export class GameScene extends Phaser.Scene {
     // Input Settings
     inputPayload = {
         pointerX: 0,
-        pointerY: 0
+        pointerY: 0,
+        sent: false
     };
+
+    // Map Settings
+    currentMap: Tilemaps.Tilemap;
+    currentTileset: Tilemaps.Tileset;
+    gridSize = 16;
+    isLMBHeld = false;
 
     // TimeStep Settings
     elapsedTime = 0;
     fixedTimeStep = 1000 / 40;
 
     preload() {
-        // preload scene
+        // Load images
         this.load.image('ship_0001', 'https://cdn.glitch.global/3e033dcd-d5be-4db4-99e8-086ae90969ec/ship_0001.png');
+        this.load.image('base_tiles', '/assets/tilemaps/test_map/Tiles.png');
 
-        this.input.mouse.enabled = true;
+        // Load tile JSONs
+        this.load.tilemapTiledJSON('test_tilemap', '/assets/tilemaps/test_map/test_map.json');
+
+        this.input.mouse!.enabled = true;
     }
 
     async create() {
@@ -48,13 +62,20 @@ export class GameScene extends Phaser.Scene {
             return;
         }
 
-        this.room.state.players.onAdd((player, sessionId) => {
+        this.room.state.currentMap.onChange(() => {
+            console.log("GENERATE MAP!");
+            this.generateMap();
+        });
+
+        this.room.state.playerUnits.onAdd((unit, sessionId) => {
             //
             // A player has joined!
             //
             console.log("A player has joined! Their unique session id is", sessionId);
 
-            const entity = this.physics.add.image(player.x, player.y, 'ship_0001');
+            const entity = this.physics.add.image(unit.currPos.x * this.gridSize, unit.currPos.y * this.gridSize, 'ship_0001');
+            entity.width = entity.height = 16;
+            entity.scale = 0.5;
             this.playerEntities[sessionId] = entity;
 
             if (sessionId === this.room.sessionId) {
@@ -66,23 +87,26 @@ export class GameScene extends Phaser.Scene {
                 this.remoteRef = this.add.rectangle(0, 0, entity.width, entity.height);
                 this.remoteRef.setStrokeStyle(1, 0xff0000);
 
-                player.onChange(() => {
-                    this.remoteRef.x = player.x;
-                    this.remoteRef.y = player.y;
-                });
-            } else {
-                // all remote players are here!
-                // (same as before, we are going to interpolate remote players)
-                player.onChange(() => {
-                    entity.setData('serverX', player.x);
-                    entity.setData('serverY', player.y);
-                });
+                this.inputPayload.pointerX = unit.currPos.x;
+                this.inputPayload.pointerY = unit.currPos.y;
+
+                this.cameras.main.startFollow(this.currentPlayer);
+                this.cameras.main.setViewport(0, 0, 200, 200);
+                this.cameras.main.setZoom(2, 2);
+                this.cameras.main.setSize(800, 640);
             }
 
-            entity.setData('velocity', player.velocity);
+            unit.currPos.onChange(() => {
+                entity.setData('serverX', unit.currPos.x * this.gridSize);
+                entity.setData('serverY', unit.currPos.y * this.gridSize);
+                this.remoteRef.x = unit.currPos.x * this.gridSize;
+                this.remoteRef.y = unit.currPos.y * this.gridSize;
+            });
+
+            entity.setData('movespeed', unit.attributes.get(unit.inputInfo.speedAttrKey)?.currentValue);
         });
 
-        this.room.state.players.onRemove((player, sessionId) => {
+        this.room.state.playerUnits.onRemove((player, sessionId) => {
             const entity = this.playerEntities[sessionId];
             if (entity) {
                 // destroy entity
@@ -96,42 +120,54 @@ export class GameScene extends Phaser.Scene {
 
     update(time: number, delta: number): void {
         // skip loop if not connected yet.
-        if (!this.currentPlayer) { return; }
+        if (!this.room) { return; }
 
-        if(game.input.activePointer.leftButtonDown()) {
-            this.inputPayload.pointerX = game.input.activePointer.x;
-            this.inputPayload.pointerY = game.input.activePointer.y;
+        if (game.input.activePointer.leftButtonDown() && !this.isLMBHeld) {
+            const newInputPosition = { x: this.input.activePointer.worldX, y: this.input.activePointer.worldY };
+            const gridInputPosition = convertPixelPositionToGridPosition(newInputPosition, this.gridSize);
+            this.inputPayload.pointerX = gridInputPosition.x;
+            this.inputPayload.pointerY = gridInputPosition.y;
+            this.inputPayload.sent = false;
+            this.isLMBHeld = true;
+        }
+
+        if (game.input.activePointer.leftButtonReleased()) {
+            this.isLMBHeld = false;
+        }
+
+        if (!this.inputPayload.sent) {
+            this.room.send(0, this.inputPayload);
+            this.inputPayload.sent = true;
         }
 
         this.elapsedTime += delta;
         while (this.elapsedTime >= this.fixedTimeStep) {
             this.elapsedTime -= this.fixedTimeStep;
-            this.fixedTick(time, this.fixedTimeStep);
+            this.fixedTick(this.fixedTimeStep);
         }
     }
 
-    fixedTick(time: number, delta: number) {
+    fixedTick(timeStep: number) {
         // skip loop if not connected with room yet.
         if (!this.room) { return; }
 
-        // send input to the server
-        const { velocity } = this.playerEntities[this.room.sessionId].data.values;
-        this.inputPayload.pointerX;
-        this.inputPayload.pointerY;
-        this.room.send(0, this.inputPayload);
-
         for (let sessionId in this.playerEntities) {
-            if (sessionId === this.room.sessionId) {
-                continue;
-            }
-
             // interpolate all player entities
             const entity = this.playerEntities[sessionId];
             const { serverX, serverY } = entity.data.values;
 
-            entity.x = Phaser.Math.Linear(entity.x, serverX, 0.2);
-            entity.y = Phaser.Math.Linear(entity.y, serverY, 0.2);
+            entity.x = Phaser.Math.Linear(entity.x, serverX, 0.1);
+            entity.y = Phaser.Math.Linear(entity.y, serverY, 0.1);
         }
+    }
+
+    generateMap() {
+        this.currentMap = this.make.tilemap({ key: 'test_tilemap' });
+        this.currentTileset = this.currentMap.addTilesetImage('Dungeon', 'base_tiles')!;
+
+        this.currentMap.createLayer('Ground', this.currentTileset);
+        this.currentMap.createLayer('Wall', this.currentTileset);
+        this.gridSize = this.room.state.currentMap.gridSize;
     }
 }
 
@@ -139,8 +175,8 @@ export class GameScene extends Phaser.Scene {
 const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,
     width: 800,
-    height: 600,
-    backgroundColor: '#b6d53c',
+    height: 640,
+    backgroundColor: '#000000',
     parent: 'phaser-example',
     physics: { default: "arcade" },
     pixelArt: true,

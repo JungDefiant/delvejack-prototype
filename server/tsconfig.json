@@ -17,5 +17,5 @@
     "src",
     "../shared",
     "../assets"
-  ]
+, "src/utils", "../client/src/utils/positionConversion.ts"  ]
 }

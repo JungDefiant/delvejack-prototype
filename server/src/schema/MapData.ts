@@ -7,4 +7,7 @@ export class MapRow extends Schema {
 export class MapData extends Schema {
     @type([MapRow]) arrayData = new ArraySchema<MapRow>();
     @type("string") mapPath: string;
+    @type("number") gridSize: number;
+    height: number;
+    width: number;
 }

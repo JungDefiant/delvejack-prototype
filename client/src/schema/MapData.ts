@@ -11,4 +11,5 @@ import { MapRow } from './MapRow'
 export class MapData extends Schema {
     @type([ MapRow ]) public arrayData: ArraySchema<MapRow> = new ArraySchema<MapRow>();
     @type("string") public mapPath!: string;
+    @type("number") public gridSize!: number;
 }

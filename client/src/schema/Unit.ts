@@ -13,11 +13,8 @@ import { InputInfo } from './InputInfo'
 export class Unit extends Schema {
     @type("string") public entityId!: string;
     @type("number") public tick!: number;
-    @type("number") public pathIndex!: number;
-    @type("boolean") public isMoving!: boolean;
     @type(Position) public currPos: Position = new Position();
     @type(Position) public destPos: Position = new Position();
-    @type([ Position ]) public currPath: ArraySchema<Position> = new ArraySchema<Position>();
     @type({ map: Attribute }) public attributes: MapSchema<Attribute> = new MapSchema<Attribute>();
     @type(InputInfo) public inputInfo: InputInfo = new InputInfo();
 }

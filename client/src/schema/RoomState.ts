@@ -7,7 +7,9 @@
 
 import { Schema, type, ArraySchema, MapSchema, SetSchema, DataChange } from '@colyseus/schema';
 import { Unit } from './Unit'
+import { MapData } from './MapData'
 
 export class RoomState extends Schema {
     @type({ map: Unit }) public playerUnits: MapSchema<Unit> = new MapSchema<Unit>();
+    @type(MapData) public currentMap: MapData = new MapData();
 }

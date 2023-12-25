@@ -1,24 +1,29 @@
 import { Schema, MapSchema, ArraySchema, type } from "@colyseus/schema";
 import { Position } from "./Position";
-import { Attribute } from "../Attribute";
+import { Attribute } from "./Attribute";
 import { EventEmitter } from "tseep";
-import { InputData } from "../Input";
+import { InputData } from "./Input";
 
 export class InputInfo extends Schema {
     @type("string") speedAttrKey: string;
 }
 
 export class Unit extends Schema {
-    inputQueue: InputData[];
+    inputQueue: InputData[] = [];
     @type("string") entityId: string;
     @type("number") tick: number;
 
     // Pathfinding settings
-    @type("number") pathIndex: number;
-    @type("boolean") isMoving: boolean;
+    isMoving: boolean;
+    pathIndex: number;
+    currPath: Position[] = [];
+    nextPos: Position;
+    moveRecharge: number;
     @type(Position) currPos = new Position();
     @type(Position) destPos = new Position();
-    @type({ array: Position }) currPath = new ArraySchema<Position>();
+
+    // Action settings
+    actionTimer: number;
 
     // Other settings
     @type({ map: Attribute }) attributes = new MapSchema<Attribute>();

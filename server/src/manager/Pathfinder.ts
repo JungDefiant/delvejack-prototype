@@ -1,19 +1,27 @@
 import EasyStar from "easystarjs";
-import { Unit } from "../rooms/schema/units/Unit";
-import { Position } from "../rooms/schema/units/Position";
-import { magnitude } from "../../../shared/utils/magnitude";
+import { magnitude } from "../utils/magnitude";
+import { Unit } from "../schema/Unit";
+import { Position } from "../schema/Position";
+import { MapData } from "../schema/MapData";
 
 export class Pathfinder {
 
     // Pathfinding Settings
     static pathing = new EasyStar.js();
-    static minDist = 0.1;
+    static minDist = 0.01;
 
     static SetCurrentGrid(map: number[][]) {
         this.pathing.setGrid(map);
+        this.pathing.setAcceptableTiles([0]);
+        this.pathing.enableDiagonals();
+        this.pathing.disableCornerCutting();
     }
 
-    static FindPath(entityId: string, unit: Unit) {
+    static FindPath(unit: Unit, map: MapData) {
+
+        console.log(`CURR POS ${unit.currPos.x}, ${unit.currPos.y}`);
+        console.log(`DEST POS ${unit.destPos.x}, ${unit.destPos.y}`);
+
         const distX = unit.destPos.x - unit.currPos.x;
         const distY = unit.destPos.y - unit.currPos.y;
         const mag = magnitude(distX, distY);
@@ -23,43 +31,22 @@ export class Pathfinder {
         }
 
         this.pathing.findPath(unit.currPos.x, unit.currPos.y, unit.destPos.x, unit.destPos.y, (path) => {
-            path.forEach(pos => {
-                const newPos = new Position();
-                newPos.x = pos.x;
-                newPos.y = pos.y;
-                unit.currPath.push(newPos); 
-            });
-            unit.pathIndex = 0;
-            unit.isMoving = true;
-        });
-    } 
+            unit.currPath = [];
 
-    static MoveOnPath(unit: Unit, deltaTime: number) {
-        if(!unit.isMoving) {
-            return;
-        }
-
-        const speedAttr = unit.attributes.get(unit.inputInfo.speedAttrKey);
-        const distMoved = speedAttr.currentValue * deltaTime;
-
-        const distX = unit.destPos.x - unit.currPos.x;
-        const distY = unit.destPos.y - unit.currPos.y;
-        const mag = magnitude(distX, distY);
-
-        if(mag < distMoved) {
-            unit.currPos.x += distX;
-            unit.currPos.y += distY;
-            unit.pathIndex++;
-
-            if(unit.pathIndex >= unit.currPath.length) {
-                unit.isMoving = false;
+            if(!path) {
+                return;
             }
-        }
-        else {
-            const normX = distX / mag;
-            const normY = distY / mag;
-            unit.currPos.x += normX * distMoved;
-            unit.currPos.y += normY * distMoved;
-        }
-    }
+
+            for (let i = 1; i < path.length; i++) {
+                const newPos = new Position();
+                newPos.x = path[i].x;
+                newPos.y = path[i].y;
+                unit.currPath.push(newPos);
+            }
+
+            unit.nextPos = unit.currPath.shift();
+        });
+
+        this.pathing.calculate();
+    } 
 }
