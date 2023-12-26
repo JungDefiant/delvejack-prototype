@@ -1,5 +1,8 @@
 {
     "unit_base": {
+        "tag_info": [
+            "ANC_DRAIKI"
+        ],
         "attribute_info": {
             "attr_base": 0
         },

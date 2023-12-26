@@ -59,7 +59,7 @@ export class GameRoom extends Room<RoomState> {
     moveSpeedAttr.baseValue = moveSpeedAttr.currentValue = 120;
     playerUnit.attributes.set(moveSpeedAttr.id, moveSpeedAttr);
 
-    playerUnit.moveRecharge = (60 / playerUnit.attributes.get(playerUnit.inputInfo.speedAttrKey).currentValue) * 1000;
+    playerUnit.moveRecharge = Math.round((60 / playerUnit.attributes.get(playerUnit.inputInfo.speedAttrKey).currentValue) * 1000);
 
     // place player in the map of players by its sessionId
     // (client.sessionId is unique per connection!)
@@ -93,8 +93,6 @@ export class GameRoom extends Room<RoomState> {
           continue;
         }
 
-        console.log(`INPUT ${input.pointerX} ${input.pointerY}`);
-
         playerUnit.destPos.x = input.pointerX;
         playerUnit.destPos.y = input.pointerY;
         playerUnit.tick = input.tick;
@@ -113,18 +111,16 @@ export class GameRoom extends Room<RoomState> {
       return;
     }
 
-    if (unit.actionTimer < unit.moveRecharge) {
-      unit.actionTimer += timeStep;
+    if (unit.moveTimer < unit.moveRecharge) {
+      unit.moveTimer += timeStep;
       return;
     }
-
-    console.log("RECHARGE MOVE", unit.actionTimer);
 
     // TO DO: check collision
 
     unit.currPos = unit.nextPos;
     unit.nextPos = unit.currPath.shift();
-    unit.actionTimer = 0;
+    unit.moveTimer = 0;
 
     if (!unit.nextPos) {
       return;

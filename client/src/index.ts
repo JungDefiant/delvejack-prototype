@@ -162,11 +162,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     generateMap() {
-        this.currentMap = this.make.tilemap({ key: 'test_tilemap' });
-        this.currentTileset = this.currentMap.addTilesetImage('Dungeon', 'base_tiles')!;
+        // this.currentMap = this.make.tilemap({ key: 'test_tilemap' });
+        // this.currentTileset = this.currentMap.addTilesetImage('Dungeon', 'base_tiles')!;
 
-        this.currentMap.createLayer('Ground', this.currentTileset);
-        this.currentMap.createLayer('Wall', this.currentTileset);
+        // this.currentMap.createLayer('Ground', this.currentTileset);
+        // this.currentMap.createLayer('Wall', this.currentTileset);
         this.gridSize = this.room.state.currentMap.gridSize;
     }
 }

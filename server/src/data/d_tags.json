@@ -1,3 +1,8 @@
 {
-    "U_STUNNED": 1
+    "ANC_DRAIKI": 1000,
+    "ANC_GATHAN": 1001,
+    "ANC_MUJAI": 1002,
+    "ANC_JASSAI": 1003,
+    "ANC_ERDONI": 1004,
+    "U_STUNNED": 2000
 }

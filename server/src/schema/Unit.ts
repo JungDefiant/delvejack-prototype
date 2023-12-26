@@ -18,12 +18,12 @@ export class Unit extends Schema {
     pathIndex: number;
     currPath: Position[] = [];
     nextPos: Position;
-    moveRecharge: number;
+    destPos: Position = new Position();
     @type(Position) currPos = new Position();
-    @type(Position) destPos = new Position();
 
     // Action settings
-    actionTimer: number;
+    moveTimer: number;
+    moveRecharge: number;
 
     // Other settings
     @type({ map: Attribute }) attributes = new MapSchema<Attribute>();

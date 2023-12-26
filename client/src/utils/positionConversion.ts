@@ -10,6 +10,5 @@ export function convertPixelPositionToGridPosition(gridPos: { x: number, y: numb
     const newPos = { x: 0, y: 0 };
     newPos.x = Math.round(gridPos.x / gridSize);
     newPos.y = Math.round(gridPos.y / gridSize);
-    console.log(`POS ${newPos.x} ${newPos.y}`);
     return newPos;
 }
