@@ -1,5 +1,5 @@
 import fs from "fs";
-import { MapData, MapRow } from "../schema/MapData";
+import { MapData, MapRow, TileData } from "../schema/MapData";
 
 export class MapParser {
 
@@ -27,7 +27,10 @@ export class MapParser {
         for (let i = 0; i < wallData.length; i += width) {
             const newMapRow = new MapRow();
             for (let j = 0; j < width; j++) {
-                newMapRow.rowData.push(wallData[i + j] > 0 ? 1 : 0);
+                const newTileData = new TileData();
+                newTileData.isWall = wallData[i + j] > 0 ? true : false;
+                newTileData.occupyingUnit = null;
+                newMapRow.rowData.push(newTileData);
             }
             newMapData.arrayData.push(newMapRow);
         }
@@ -43,7 +46,7 @@ export class MapParser {
             const mapDataRow = map.arrayData[i];
             const gridRow = [];
             for (let j = 0; j < mapDataRow.rowData.length; j++) {
-                const number = mapDataRow.rowData[j];
+                const number = mapDataRow.rowData[j].isWall ? 1 : 0;
                 gridRow.push(number);
             }
 

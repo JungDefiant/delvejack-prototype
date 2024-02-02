@@ -6,8 +6,8 @@
 // 
 
 import { Schema, type, ArraySchema, MapSchema, SetSchema, DataChange } from '@colyseus/schema';
-
+import { TileData } from './TileData'
 
 export class MapRow extends Schema {
-    @type([ "number" ]) public rowData: ArraySchema<number> = new ArraySchema<number>();
+    @type([ TileData ]) public rowData: ArraySchema<TileData> = new ArraySchema<TileData>();
 }

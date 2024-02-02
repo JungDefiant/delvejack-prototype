@@ -10,6 +10,7 @@ import { Unit } from './Unit'
 import { MapData } from './MapData'
 
 export class RoomState extends Schema {
-    @type({ map: Unit }) public playerUnits: MapSchema<Unit> = new MapSchema<Unit>();
+    @type({ map: Unit }) public players: MapSchema<Unit> = new MapSchema<Unit>();
+    @type({ map: Unit }) public npcs: MapSchema<Unit> = new MapSchema<Unit>();
     @type(MapData) public currentMap: MapData = new MapData();
 }

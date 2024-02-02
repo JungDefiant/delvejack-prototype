@@ -14,5 +14,6 @@ export class Attribute extends Schema {
     @type("string") public abbrevName!: string;
     @type("number") public baseValue!: number;
     @type("number") public currentValue!: number;
+    @type("number") public lastTickChange!: number;
     @type({ map: AttributeModifier }) public modifiers: MapSchema<AttributeModifier> = new MapSchema<AttributeModifier>();
 }

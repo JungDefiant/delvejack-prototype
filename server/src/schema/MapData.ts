@@ -1,7 +1,13 @@
 import { Schema, ArraySchema, type } from "@colyseus/schema";
+import { Unit } from "./Unit";
+
+export class TileData extends Schema {
+    @type("boolean") isWall: boolean;
+    @type(Unit) occupyingUnit: Unit;
+}
 
 export class MapRow extends Schema {
-    @type(["number"]) rowData = new ArraySchema<number>();
+    @type([TileData]) rowData = new ArraySchema<TileData>();
 }
 
 export class MapData extends Schema {

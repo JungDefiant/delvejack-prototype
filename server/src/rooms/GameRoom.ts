@@ -1,27 +1,30 @@
 import { Room, Client } from "@colyseus/core";
 import { MapParser } from "../parsers/MapParser";
-import { Pathfinder } from "../manager/Pathfinder";
+import { PathfindingSystem } from "../systems/PathfindingSystem";
 import { RoomState } from "../schema/RoomState";
-import { InputData } from "../schema/Input";
 import { Unit } from "../schema/Unit";
 import { Attribute } from "../schema/Attribute";
-import { magnitude } from "../utils/magnitude";
-import { MapData } from "../schema/MapData";
+import { ActionSequence } from "../schema/ActionSequence";
+import { Action, ActionDirectInfo, ActionMoveInfo, ActionType } from "../schema/Action";
+import { ActionSystem } from "../systems/ActionSystem";
 
 export class GameRoom extends Room<RoomState> {
   maxClients = 4;
 
   // TimeStep Settings
   elapsedTime = 0;
-  fixedTimeStep = 1000 / 40;
+  fixedTimeStep = 1000 / 20;
 
   onCreate(options: any) {
     this.setState(new RoomState());
 
+    this.state.actionSystem = new ActionSystem(this.state);
+    this.state.pathfindingSystem = new PathfindingSystem();
+
     // handle player input
     this.onMessage(0, (client, input) => {
       // get reference to the player who sent the message
-      const player = this.state.playerUnits.get(client.sessionId);
+      const player = this.state.players.get(client.sessionId);
 
       // enqueue input to user input buffer.
       player.inputQueue.push(input);
@@ -38,37 +41,80 @@ export class GameRoom extends Room<RoomState> {
 
     this.state.currentMap = MapParser.ParseMapDataFromJSON("../assets/tilemaps/test_map/test_map.json");
     this.state.currentPathGrid = MapParser.CreateEasyStarMapFromMapData(this.state.currentMap);
-    Pathfinder.SetCurrentGrid(this.state.currentPathGrid);
+    this.state.pathfindingSystem.SetCurrentGrid(this.state.currentPathGrid);
   }
 
   onJoin(client: Client, options: any) {
     console.log(client.sessionId, "joined!");
 
+    const playerUnit = this.initializePlayerUnit();
+
+    // place player in the map of players by its sessionId
+    // (client.sessionId is unique per connection!)
+    this.state.players.set(client.sessionId, playerUnit);
+  }
+
+  initializePlayerUnit(): Unit {
     // create Player instance
     const playerUnit = new Unit();
 
     // place Player at a random position
     playerUnit.currPos.x = 20;
     playerUnit.currPos.y = 20;
-    playerUnit.destPos.x = 20;
-    playerUnit.destPos.y = 20;
+
+    // parse attribute schema and add attributes
     playerUnit.inputInfo.speedAttrKey = "attr_movespeed";
 
     const moveSpeedAttr = new Attribute();
     moveSpeedAttr.id = "attr_movespeed";
-    moveSpeedAttr.baseValue = moveSpeedAttr.currentValue = 120;
+    moveSpeedAttr.baseValue = moveSpeedAttr.currentValue = 4;
     playerUnit.attributes.set(moveSpeedAttr.id, moveSpeedAttr);
 
-    playerUnit.moveRecharge = Math.round((60 / playerUnit.attributes.get(playerUnit.inputInfo.speedAttrKey).currentValue) * 1000);
+    // Add movement ability
+    const basicMove = new ActionSequence();
+    basicMove.key = "aq_basicMove";
+    basicMove.actionKey = "move";
+    basicMove.rechargeTime = 0;
 
-    // place player in the map of players by its sessionId
-    // (client.sessionId is unique per connection!)
-    this.state.playerUnits.set(client.sessionId, playerUnit);
+    const moveAction = new Action();
+    moveAction.key = "a_moveToTile";
+    moveAction.actionType = ActionType.PerformMove;
+    moveAction.actionInfo = new ActionMoveInfo();
+    moveAction.actionInfo.speedModifier = 1;
+    moveAction.actionInfo.stopWithinRange = 0;
+    moveAction.actionInfo.canRepath = true;
+    moveAction.actionInfo.canOverrideWithInput = true;
+    moveAction.actionInfo.moveToUnit = false;
+    moveAction.castTime = moveSpeedAttr.currentValue * this.fixedTimeStep;
+
+    basicMove.actions.push(moveAction);
+    playerUnit.actionInputMap.set(basicMove.actionKey, basicMove);
+    playerUnit.rechargeTimes.set(basicMove.actionKey, 0);
+
+    // Add attack ability
+    const basicAttack = new ActionSequence();
+    basicAttack.key = "aq_basicAttack";
+    basicAttack.actionKey = "attack";
+    basicAttack.rechargeTime = 1000;
+
+    const attackAction = new Action();
+    attackAction.key = "a_attack";
+    attackAction.actionType = ActionType.ApplyDirectEffect;
+    attackAction.actionInfo = new ActionDirectInfo();
+    attackAction.actionInfo.hasProjectile = false;
+    attackAction.actionInfo.range = 1;
+    attackAction.castTime = 120;  
+
+    basicAttack.actions.push(attackAction);
+    playerUnit.actionInputMap.set(basicAttack.actionKey, basicAttack);
+    playerUnit.rechargeTimes.set(basicAttack.actionKey, 0);
+
+    return playerUnit;
   }
 
   onLeave(client: Client, consented: boolean) {
     console.log(client.sessionId, "left!");
-    this.state.playerUnits.delete(client.sessionId);
+    this.state.players.delete(client.sessionId);
   }
 
   onDispose() {
@@ -80,54 +126,11 @@ export class GameRoom extends Room<RoomState> {
   }
 
   fixedTick(timeStep: number) {
-    this.state.playerUnits.forEach(playerUnit => {
-      let input: any;
-      let hasInput = false;
+    if(!this.state) {
+      return;
+    }
 
-      // Dequeue player inputs
-      while (input = playerUnit.inputQueue.shift()) {
-        if (input.pointerX >= this.state.currentMap.width) {
-          continue;
-        }
-        else if (input.pointerY >= this.state.currentMap.height) {
-          continue;
-        }
-
-        playerUnit.destPos.x = input.pointerX;
-        playerUnit.destPos.y = input.pointerY;
-        playerUnit.tick = input.tick;
-        hasInput = true;
-      }
-
-      if (hasInput) {
-        Pathfinder.FindPath(playerUnit, this.state.currentMap);
-      }
-      this.MoveOnPath(playerUnit, timeStep);
-    });
+    this.state.actionSystem.OnTick(this.state.players, timeStep);
   }
 
-  MoveOnPath(unit: Unit, timeStep: number) {
-    if (!unit.nextPos) {
-      return;
-    }
-
-    if (unit.moveTimer < unit.moveRecharge) {
-      unit.moveTimer += timeStep;
-      return;
-    }
-
-    // TO DO: check collision
-
-    unit.currPos = unit.nextPos;
-    unit.nextPos = unit.currPath.shift();
-    unit.moveTimer = 0;
-
-    if (!unit.nextPos) {
-      return;
-    }
-
-    console.log(`CURR ${unit.currPos.x}, ${unit.currPos.y}`);
-    console.log(`NEXT ${unit.nextPos.x}, ${unit.nextPos.y}`);
-    console.log(`DEST ${unit.destPos.x}, ${unit.destPos.y}`);
-  }
 }

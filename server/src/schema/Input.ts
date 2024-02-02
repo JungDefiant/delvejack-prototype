@@ -1,5 +1,6 @@
 export interface InputData {
-    pointerX: number;
-    pointerY: number;
+    directionX: number;
+    directionY: number;
+    actionKey: string;
     tick: number;
 }

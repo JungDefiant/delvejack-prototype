@@ -7,5 +7,6 @@ export class Attribute extends Schema {
     @type("string") abbrevName: string;
     @type("number") baseValue: number;
     @type("number") currentValue: number;
+    @type("number") lastTickChange: number;
     @type({ map: AttributeModifier }) modifiers = new MapSchema<AttributeModifier>();
 }
