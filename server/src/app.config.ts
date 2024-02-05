@@ -14,7 +14,7 @@ export default config({
          * Define your room handlers:
          */
         gameServer.define('my_room', GameRoom);
-        gameServer.simulateLatency(60);
+        gameServer.simulateLatency(120);
 
     },
 

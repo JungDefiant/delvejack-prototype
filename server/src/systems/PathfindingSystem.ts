@@ -8,11 +8,12 @@ import { ActionMoveState } from "../schema/Action";
 export class PathfindingSystem {
 
     // Pathfinding Settings
+    currentPathGrid: number[][];
     pathing = new EasyStar.js();
     minDist = 0.01;
 
-    SetCurrentGrid(map: number[][]) {
-        this.pathing.setGrid(map);
+    SetCurrentGrid() {
+        this.pathing.setGrid(this.currentPathGrid);
         this.pathing.setAcceptableTiles([0]);
         this.pathing.enableDiagonals();
         this.pathing.disableCornerCutting();

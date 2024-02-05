@@ -11,15 +11,16 @@ import { magnitude } from "../utils/magnitude";
 import { ActionEffect, EffectModifierType, EffectTargetType } from "../schema/ActionEffect";
 import fs from "fs";
 import { GetUnitAtPosition, SetUnitToTile } from "../utils/mapUtils";
+import { GameRoom } from "../rooms/GameRoom";
 
 export class ActionSystem implements ISystem {
 
     currentTick: number;
-    state: RoomState;
+    currentRoom: GameRoom;
     effectData: any;
 
-    constructor(_state: RoomState) {
-        this.state = _state;
+    constructor(_room: GameRoom) {
+        this.currentRoom = _room;
         this.effectData = JSON.parse(fs.readFileSync("./src/data/abilities/d_effects.json", "utf-8"));
     }
 
@@ -35,8 +36,8 @@ export class ActionSystem implements ISystem {
 
                 const targetPositionX = unit.currPos.x + input.directionX;
                 const targetPositionY = unit.currPos.y + input.directionY;
-                if (targetPositionX > Math.floor(this.state.currentMap.width / this.state.currentMap.gridSize) ||
-                    targetPositionY > Math.floor(this.state.currentMap.height / this.state.currentMap.gridSize) ||
+                if (targetPositionX > Math.floor(this.currentRoom.state.currentMap.width / this.currentRoom.state.currentMap.gridSize) ||
+                    targetPositionY > Math.floor(this.currentRoom.state.currentMap.height / this.currentRoom.state.currentMap.gridSize) ||
                     targetPositionX < 0 ||
                     targetPositionY < 0 ||
                     input.actionKey === "") {
@@ -47,7 +48,10 @@ export class ActionSystem implements ISystem {
                 
                 const actionSeq = unit.actionInputMap.get(input.actionKey);
                 if(unit.rechargeTimes.get(input.actionKey) >= actionSeq.rechargeTime) {
-                    if(unit.currentActionSequence || !unit.currentActionSequence) {
+                    if(unit.currentActionSequence && actionSeq.queueable) {
+                        unit.queuedActionSequence = actionSeq;
+                    }
+                    else if(!unit.currentActionSequence) {
                         unit.queuedActionSequence = actionSeq;
                     }
                 }
@@ -92,11 +96,11 @@ export class ActionSystem implements ISystem {
             actionState.isCasting = true;
             setTimeout(() => {
                 actionState.isCasting = false;
-                func(this.state, source, action.castTime + timeStep)
+                func(this.currentRoom, source, action.castTime + timeStep)
             }, action.castTime);
         }
         else {
-            func(this.state, source, timeStep);
+            func(this.currentRoom, source, timeStep);
         }
     }
 
@@ -210,18 +214,18 @@ export class ActionSystem implements ISystem {
     }
 
     // Direct Action Functions
-    OnCastDirectAction(roomState: RoomState, source: Unit, timeStep: number) {
-        const actionSystem = roomState.actionSystem;
-        const target = GetUnitAtPosition(roomState.currentMap, source.currentActionSeqState.targetPos);
-        actionSystem.ApplyEffectsToTargets(roomState, source, [target]);
+    OnCastDirectAction(room: GameRoom, source: Unit, timeStep: number) {
+        const actionSystem = room.actionSystem;
+        const target = GetUnitAtPosition(room.state.currentMap, source.currentActionSeqState.targetPos);
+        actionSystem.ApplyEffectsToTargets(room, source, [target]);
         actionSystem.OnEndAction(source, timeStep);
     }
 
     OnTickDirectAction(source: Unit, timeStep: number) {
     }
 
-    ApplyEffectsToTargets(roomState: RoomState, source: Unit, targets: Unit[]) {
-        const actionSystem = roomState.actionSystem;
+    ApplyEffectsToTargets(room: GameRoom, source: Unit, targets: Unit[]) {
+        const actionSystem = room.actionSystem;
         const filter = source.currentAction.targetFilter;
 
         targets.forEach(target => {
@@ -230,17 +234,17 @@ export class ActionSystem implements ISystem {
                 source.currentAction.effectKeyArray.forEach((key) => {
                     const eff = actionSystem.effectData[key] as ActionEffect;
                     if(eff.targetType === EffectTargetType.Target) {
-                        actionSystem.ApplyEffectToUnit(roomState, eff, source, source);
+                        actionSystem.ApplyEffectToUnit(room, eff, source, source);
                     }
                     else if (eff.targetType === EffectTargetType.Caster) {
-                        actionSystem.ApplyEffectToUnit(roomState, eff, source, target);
+                        actionSystem.ApplyEffectToUnit(room, eff, source, target);
                     }
                 });
             }
         });
     }
 
-    ApplyEffectToUnit(roomState: RoomState, effect: ActionEffect, source: Unit, target: Unit) {
+    ApplyEffectToUnit(room: GameRoom, effect: ActionEffect, source: Unit, target: Unit) {
         // Apply tags
         effect.tagsApplied.forEach((tag) => {
             if(!target.tags.has(tag)) {
@@ -270,19 +274,12 @@ export class ActionSystem implements ISystem {
 
 
     // Move Action Functions
-    OnCastMoveAction(roomState: RoomState, source: Unit, timeStep: number) {
+    OnCastMoveAction(room: GameRoom, source: Unit, timeStep: number) {
         const actionState = source.currentActionState as ActionMoveState;
         actionState.currentTick = timeStep;
         actionState.currentPath = null;
         actionState.nextPos = source.currentActionSeqState.targetPos;
-
-        // roomState.actionSystem.OnTickMoveAction(source, timeStep);
-        // const speedAttr = source.attributes.get(source.inputInfo.speedAttrKey);
-        // actionState.timePerMove = (1 / speedAttr.currentValue)
-        //     * (source.currentAction.actionInfo as ActionMoveInfo).speedModifier
-        //     * 1000;
-        // actionState.currentDelay = 0;
-        // roomState.pathfindingSystem.FindPath(source, source.currentActionSeqState.targetPos, source.currentActionState as ActionMoveState);
+        room.actionSystem.OnTickMoveAction(source, timeStep);
     }
 
     OnTickMoveAction(source: Unit, timeStep: number) {
@@ -305,14 +302,14 @@ export class ActionSystem implements ISystem {
         }
 
         // Check collision, call OnInterruptMoveAction if collision
-        if (GetUnitAtPosition(this.state.currentMap, actionState.nextPos)) {
+        if (GetUnitAtPosition(this.currentRoom.state.currentMap, actionState.nextPos)) {
             this.OnInterruptAction(source, timeStep);
             return;
         }
 
         // Set new position
-        SetUnitToTile(this.state.currentMap, source.currPos, null);
-        SetUnitToTile(this.state.currentMap, actionState.nextPos, source);
+        SetUnitToTile(this.currentRoom.state.currentMap, source.currPos, null);
+        SetUnitToTile(this.currentRoom.state.currentMap, actionState.nextPos, source);
         source.currPos = actionState.nextPos;
         actionState.nextPos = null;
 
@@ -322,28 +319,28 @@ export class ActionSystem implements ISystem {
     }
 
     // Dash Action Functions
-    OnCastDashAction(roomState: RoomState, source: Unit, timeStep: number) {
+    OnCastDashAction(room: GameRoom, source: Unit, timeStep: number) {
     }
 
     OnTickDashAction(source: Unit, timeStep: number) {
     }
 
     // Blink Action Functions
-    OnCastBlinkAction(roomState: RoomState, source: Unit, timeStep: number) {
+    OnCastBlinkAction(room: GameRoom, source: Unit, timeStep: number) {
     }
 
     OnTickBlinkAction(source: Unit, timeStep: number) {
     }
 
     // Projectile Action Functions
-    OnCastProjectileAction(roomState: RoomState, source: Unit, timeStep: number) {
+    OnCastProjectileAction(room: GameRoom, source: Unit, timeStep: number) {
     }
 
     OnTickProjectileAction(source: Unit, timeStep: number) {
     }
 
     // Area Of Effect Action Functions
-    OnCastAreaOfEffectAction(roomState: RoomState, source: Unit, timeStep: number) {
+    OnCastAreaOfEffectAction(room: GameRoom, source: Unit, timeStep: number) {
     }
 
     OnTickAreaOfEffectAction(source: Unit, timeStep: number) {

@@ -13,13 +13,17 @@ export class GameRoom extends Room<RoomState> {
 
   // TimeStep Settings
   elapsedTime = 0;
-  fixedTimeStep = 1000 / 20;
+  fixedTimeStep = 1000 / 40;
+
+  // System Settings
+  actionSystem: ActionSystem;
+  pathfindingSystem: PathfindingSystem;
 
   onCreate(options: any) {
     this.setState(new RoomState());
 
-    this.state.actionSystem = new ActionSystem(this.state);
-    this.state.pathfindingSystem = new PathfindingSystem();
+    this.actionSystem = new ActionSystem(this);
+    this.pathfindingSystem = new PathfindingSystem();
 
     // handle player input
     this.onMessage(0, (client, input) => {
@@ -40,8 +44,8 @@ export class GameRoom extends Room<RoomState> {
     });
 
     this.state.currentMap = MapParser.ParseMapDataFromJSON("../assets/tilemaps/test_map/test_map.json");
-    this.state.currentPathGrid = MapParser.CreateEasyStarMapFromMapData(this.state.currentMap);
-    this.state.pathfindingSystem.SetCurrentGrid(this.state.currentPathGrid);
+    this.pathfindingSystem.currentPathGrid = MapParser.CreateEasyStarMapFromMapData(this.state.currentMap);
+    this.pathfindingSystem.SetCurrentGrid();
   }
 
   onJoin(client: Client, options: any) {
@@ -74,7 +78,8 @@ export class GameRoom extends Room<RoomState> {
     const basicMove = new ActionSequence();
     basicMove.key = "aq_basicMove";
     basicMove.actionKey = "move";
-    basicMove.rechargeTime = 0;
+    basicMove.queueable = false;
+    basicMove.rechargeTime = moveSpeedAttr.currentValue * this.fixedTimeStep;
 
     const moveAction = new Action();
     moveAction.key = "a_moveToTile";
@@ -85,7 +90,7 @@ export class GameRoom extends Room<RoomState> {
     moveAction.actionInfo.canRepath = true;
     moveAction.actionInfo.canOverrideWithInput = true;
     moveAction.actionInfo.moveToUnit = false;
-    moveAction.castTime = moveSpeedAttr.currentValue * this.fixedTimeStep;
+    // moveAction.castTime = moveSpeedAttr.currentValue * this.fixedTimeStep;
 
     basicMove.actions.push(moveAction);
     playerUnit.actionInputMap.set(basicMove.actionKey, basicMove);
@@ -130,7 +135,7 @@ export class GameRoom extends Room<RoomState> {
       return;
     }
 
-    this.state.actionSystem.OnTick(this.state.players, timeStep);
+    this.actionSystem.OnTick(this.state.players, timeStep);
   }
 
 }

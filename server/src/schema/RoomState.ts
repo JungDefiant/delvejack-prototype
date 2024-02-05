@@ -8,7 +8,4 @@ export class RoomState extends Schema {
   @type({ map: Unit }) players = new MapSchema<Unit>();
   @type({ map: Unit }) npcs = new MapSchema<Unit>();
   @type(MapData) currentMap: MapData;
-  currentPathGrid: number[][];
-  actionSystem: ActionSystem;
-  pathfindingSystem: PathfindingSystem;
 }

@@ -1,22 +1,34 @@
 import { Client, Room } from "colyseus.js";
-import Phaser, { Input, Math as PMath, Tilemaps } from "phaser";
+import Phaser, { Tilemaps } from "phaser";
 import { RoomState } from "./schema/RoomState";
-import { getDirectionFromAngle, magnitude } from "./utils/math";
-import { acos, atan, atan2, dot, pi, sqrt } from "mathjs";
+import { getDirectionFromAngle } from "./utils/math";
+
+type Key = Phaser.Input.Keyboard.Key;
 
 interface InputData {
     directionX: number,
     directionY: number,
     actionKey: string,
     tick: number,
-    sent: boolean
+    sent: boolean,
+    accum: 0
 }
 
 interface InputState {
-    moveUp: boolean;
-    moveDown: boolean;
-    moveLeft: boolean;
-    moveRight: boolean;
+    moveUp: boolean,
+    moveDown: boolean,
+    moveLeft: boolean,
+    moveRight: boolean,
+}
+
+interface ActionKeys {
+    moveUp: Key,
+    moveDown: Key,
+    moveLeft: Key,
+    moveRight: Key,
+    specSkill1: Key,
+    specSkill2: Key,
+    specSkill3: Key
 }
 
 // custom scene class
@@ -30,12 +42,14 @@ export class GameScene extends Phaser.Scene {
     destRef: Phaser.GameObjects.Rectangle;
 
     // Input Settings
+    keyboard: ActionKeys;
     inputPayload: InputData = {
         directionX: 0,
         directionY: 0,
         actionKey: "",
         tick: 0,
-        sent: false
+        sent: false,
+        accum: 0
     };
 
     inputState: InputState = {
@@ -53,7 +67,7 @@ export class GameScene extends Phaser.Scene {
 
     // TimeStep Settings
     elapsedTime = 0;
-    fixedTimeStep = 1000 / 60;
+    fixedTimeStep = 1000 / 40;
 
     preload() {
         // Load images
@@ -82,7 +96,7 @@ export class GameScene extends Phaser.Scene {
         }
 
         this.generateMap();
-        
+
         // NOTE: Add message to 'disable mouse gestures for best experience' in main menu
 
         // this.room.state.currentMap.onChange(() => {
@@ -90,7 +104,7 @@ export class GameScene extends Phaser.Scene {
         //     this.generateMap();
         // });
 
-        this.setupInputEvents();
+        this.setupActionKeys();
 
         this.room.state.players.onAdd((player, sessionId) => {
             //
@@ -115,21 +129,41 @@ export class GameScene extends Phaser.Scene {
                 this.inputPayload.directionX = 0;
                 this.inputPayload.directionY = 0;
 
-                this.cameras.main.startFollow(this.currentPlayer);
+                this.cameras.main.startFollow(this.currentPlayer, true, 0.5, 0.5);
                 this.cameras.main.setViewport(0, 0, 200, 200);
                 this.cameras.main.setZoom(4, 4);
                 this.cameras.main.setSize(800, 640);
-                // entity.setData('moveSpeed', player.attributes.get("attr_movespeed")?.currentValue!);
+
+                entity.setData('localX', player.currPos.x * this.gridSize);
+                entity.setData('localY', player.currPos.y * this.gridSize);
+                entity.setData('moveDelay', 0);
+                entity.setData('moveTime', player.attributes.get("attr_movespeed")?.currentValue! * this.fixedTimeStep);
             }
 
             player.currPos.onChange(() => {
-                entity.setData('serverX', player.currPos.x * this.gridSize);
-                entity.setData('serverY', player.currPos.y * this.gridSize);
+                // if(sessionId === this.room.sessionId) {
+                //     console.log("X: " + (player.currPos.x * this.gridSize) + ", Y: " + (player.currPos.y * this.gridSize));
+                //     entity.x = player.currPos.x * this.gridSize;
+                //     entity.y = player.currPos.y * this.gridSize;
+                // }
+                // else {
+                //     entity.setData('serverX', player.currPos.x * this.gridSize);
+                //     entity.setData('serverY', player.currPos.y * this.gridSize);
+                // }
+                entity.setData(sessionId === this.room.sessionId ? 'localX' : 'serverX', player.currPos.x * this.gridSize);
+                entity.setData(sessionId === this.room.sessionId ? 'localY' : 'serverY', player.currPos.y * this.gridSize);
+                // entity.setData('serverX', player.currPos.x * this.gridSize);
+                // entity.setData('serverY', player.currPos.y * this.gridSize);
             });
 
             player.attributes.get("attr_movespeed")?.onChange(() => {
                 entity.setData('moveSpeed', player.attributes.get("attr_movespeed")?.currentValue!);
-            })
+                entity.setData('moveTime', player.attributes.get("attr_movespeed")?.currentValue! * this.fixedTimeStep);
+            });
+
+            player.rechargeTimes.onChange(() => {
+                entity.setData('moveDelay', player.rechargeTimes.get("move"));
+            });
         });
 
         this.room.state.players.onRemove((player, sessionId) => {
@@ -142,18 +176,12 @@ export class GameScene extends Phaser.Scene {
                 delete this.playerUnits[sessionId];
             }
         });
-
-
     }
 
+    // Update/Tick Functions
     update(time: number, delta: number): void {
         // skip loop if not connected yet.
         if (!this.room) { return; }
-
-        if (!this.inputPayload.sent) {
-            this.room.send(0, this.inputPayload);
-            this.inputPayload.sent = true;
-        }
 
         this.elapsedTime += delta;
         while (this.elapsedTime >= this.fixedTimeStep) {
@@ -162,97 +190,114 @@ export class GameScene extends Phaser.Scene {
         }
     }
 
+    fixedTick(timeStep: number) {
+        // skip loop if not connected with room yet.
+        if (!this.room) { return; }
+        if (!this.currentPlayer) { return; }
+
+        for (let sessionId in this.playerUnits) {
+            this.interpolatePlayerMovements(timeStep, sessionId);
+        }
+
+        this.resetInputData();
+        this.setInputData(timeStep); 
+
+        if (!this.inputPayload.sent) {
+            this.room.send(0, this.inputPayload);
+            this.inputPayload.sent = true;
+        }
+    }
+
+    // Input Handling
     resetInputData() {
         this.inputPayload = {
             directionX: 0,
             directionY: 0,
             actionKey: "",
             tick: 0,
-            sent: false
+            sent: false,
+            accum: 0
         }
     }
 
-    setupInputEvents() {
-        this.input.keyboard?.on('keydown', (ev: any) => {
-            switch(ev.code) {
-                case 'KeyW':
-                    this.setInputData("move");
-                    this.inputPayload.directionX = 0;
+    setInputData(timeStep: number) {
+        if (!this.currentPlayer) {
+            return;
+        }
+
+        const pData = this.room.state.players.get(this.room.sessionId);
+        const { moveDelay, moveTime } = this.currentPlayer.data.values;
+
+        console.log("MOVE RECHARGE", moveDelay);
+        console.log("RECHARGE TIME", moveTime);
+
+        if(moveDelay >= moveTime) {
+            if (this.keyboard.moveUp.isDown
+                || this.keyboard.moveDown.isDown
+                || this.keyboard.moveLeft.isDown
+                || this.keyboard.moveRight.isDown) {
+                this.inputPayload.actionKey = "move";
+                if (this.keyboard.moveUp.isDown) {
                     this.inputPayload.directionY = -1;
-                    this.inputState.moveUp = true;
-                    break;
-                case 'KeyA':
-                    this.setInputData("move");
-                    this.inputPayload.directionX = -1;
-                    this.inputPayload.directionY = 0;
-                    this.inputState.moveLeft = true;
-                    break;
-                case 'KeyS':
-                    this.setInputData("move");
-                    this.inputPayload.directionX = 0;
+                    this.currentPlayer!.setData('localY', (pData!.currPos.y - 1) * this.gridSize);
+                } else if (this.keyboard.moveDown.isDown) {
                     this.inputPayload.directionY = 1;
-                    this.inputState.moveDown = true;
-                    break;
-                case 'KeyD':
-                    this.setInputData("move");
+                    this.currentPlayer!.setData('localY', (pData!.currPos.y + 1) * this.gridSize);
+                }
+    
+                if (this.keyboard.moveLeft.isDown) {
+                    this.inputPayload.directionX = -1;
+                    this.currentPlayer!.setData('localX', (pData!.currPos.x - 1) * this.gridSize);
+                } else if (this.keyboard.moveRight.isDown) {
                     this.inputPayload.directionX = 1;
-                    this.inputPayload.directionY = 0;
-                    this.inputState.moveRight = true;
-                    break;
+                    this.currentPlayer!.setData('localX', (pData!.currPos.x + 1) * this.gridSize);
+                }
+    
+                this.currentPlayer.setData('moveDelay', 0);
+                return;
             }
-            
-        });
-        
-        this.input.keyboard?.on('keyup', (ev: any) => {
-            switch(ev.code) {
-                case 'KeyW':
-                    this.inputState.moveUp = false;
-                    break;
-                case 'KeyA':
-                    this.inputState.moveLeft = false;
-                    break;
-                case 'KeyS':
-                    this.inputState.moveDown = false;
-                    break;
-                case 'KeyD':
-                    this.inputState.moveRight = false;
-                    break;
-            }
-        })
+        }
+
+        this.currentPlayer.setData('moveDelay', moveDelay + timeStep);
+    }
+
+    setupActionKeys() {
+        this.keyboard = {
+            moveUp: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+            moveDown: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+            moveLeft: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+            moveRight: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+            specSkill1: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q),
+            specSkill2: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E),
+            specSkill3: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT)
+        };
 
         this.input.on("pointerdown", () => {
             if (game.input.activePointer.leftButtonDown()) {
-                this.setInputData("attack");
                 this.setPointerDirectionToInputData();
             }
             else if (game.input.activePointer.rightButtonDown()) {
-                this.setInputData("useOffenseAbility");
                 this.setPointerDirectionToInputData();
             }
         });
 
         this.input.on("pointerup", () => {
             if (game.input.activePointer.leftButtonReleased()) { }
-            else if(game.input.activePointer.rightButtonReleased()) { }
+            else if (game.input.activePointer.rightButtonReleased()) { }
         })
-    }
-
-    setInputData(key: string) {
-        this.resetInputData();
-        this.inputPayload.actionKey = key;
     }
 
     setPointerDirectionToInputData() {
         if (this.input.activePointer.x > this.cameras.main.width ||
             this.input.activePointer.y > this.cameras.main.height) {
-                return;
+            return;
         }
 
         const playerEntity = this.playerUnits[this.room.sessionId];
         const newInputPosition = { x: this.input.activePointer.worldX, y: this.input.activePointer.worldY };
 
-        let angle= Math.atan2(newInputPosition.y - playerEntity.y, newInputPosition.x - playerEntity.x) * 180 / Math.PI;
-        
+        let angle = Math.atan2(newInputPosition.y - playerEntity.y, newInputPosition.x - playerEntity.x) * 180 / Math.PI;
+
         const dirVector = getDirectionFromAngle(Math.round(angle));
 
         if (this.destRef) {
@@ -264,25 +309,31 @@ export class GameScene extends Phaser.Scene {
         this.inputPayload.directionY = dirVector.y;
     }
 
-    fixedTick(timeStep: number) {
-        // skip loop if not connected with room yet.
-        if (!this.room) { return; }
-
-        for (let sessionId in this.playerUnits) {
-            this.interpolateEntityMovements(timeStep, sessionId);
-        }
-    }
-
-    interpolateEntityMovements(timeStep: number, sessionId: string) {
+    interpolatePlayerMovements(timeStep: number, sessionId: string) {
         // interpolate all player entities
         const entity = this.playerUnits[sessionId];
-        const { serverX, serverY, moveSpeed } = entity.data.values;
+        const { serverX, serverY, localX, localY, moveSpeed } = entity.data.values;
+        const destX = sessionId === this.room.sessionId ? localX : serverX;
+        const destY = sessionId === this.room.sessionId ? localY : serverY;
+        // const destX = serverX;
+        // const destY = serverY;
 
-        console.log((this.gridSize * moveSpeed));
-        
-        console.log((timeStep / 1000));
-        entity.x = Phaser.Math.Linear(entity.x, serverX, (moveSpeed * timeStep) / 1000);
-        entity.y = Phaser.Math.Linear(entity.y, serverY, (moveSpeed * timeStep) / 1000);
+        console.log("LOCAL X", localX);
+        console.log("LOCAL Y", localY);
+        console.log("SERVER X", serverX);
+        console.log("SERVER Y", serverY);
+        console.log("ENTITY X", entity.x);
+        console.log("ENTITY Y", entity.y);
+        console.log("PIXELS MOVED", moveSpeed * this.gridSize * (timeStep / 1000));
+
+        const pixelsToMoveX = Math.min(moveSpeed * this.gridSize * (timeStep / 1000), Math.abs(entity.x - destX));
+        const pixelsToMoveY = Math.min(moveSpeed * this.gridSize * (timeStep / 1000), Math.abs(entity.y - destY));
+        const directionX = entity.x >= destX ? -1 : 1;
+        const directionY = entity.y >= destY ? -1 : 1;
+        entity.x += pixelsToMoveX * directionX;
+        entity.y += pixelsToMoveY * directionY;
+        // entity.x = destX;
+        // entity.y = destY;
     }
 
     generateMap() {

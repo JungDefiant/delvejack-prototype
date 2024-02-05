@@ -33,6 +33,7 @@ export class ActionSequence extends Schema {
     @type("number") rechargeTime: number;
     @type("string") resourceAttrKey: string;
     @type("number") resourceCost: number;
+    @type("boolean") queueable: boolean;
     targetingInfo: TargetingInfo;
     actions: ArraySchema<Action> = new ArraySchema<Action>();
     actionVariables = new MapSchema<ActionVariable>();
